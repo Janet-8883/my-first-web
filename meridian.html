@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D人体经络穴位查询</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,sans-serif;}
+body{overflow:hidden;background:#111;color:#fff;}
+#container{width:100vw;height:100vh;}
+#ui{position:absolute;top:12px;left:12px;z-index:10;background:rgba(0,0,0,0.7);padding:12px;border-radius:8px;min-width:280px;}
+#searchInput{width:100%;padding:8px 10px;font-size:14px;border:0;border-radius:4px;margin-bottom:8px;}
+#resetBtn{width:100%;padding:8px;background:#2563eb;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:14px;}
+#tip{margin-top:8px;font-size:12px;color:#ccc;}
+</style>
+</head>
+<body>
+<div id="container"></div>
+<div id="ui">
+  <input id="searchInput" placeholder="输入穴位名搜索（如：合谷、足三里）">
+  <button id="resetBtn">重置视角</button>
+  <div id="tip">搜索后自动定位并高亮穴位，拖拽旋转，滚轮缩放</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// ===================== 完整经络穴位数据 =====================
+const meridianData = [
+  {name:"手太阴肺经",color:0xff4444,points:[
+    {name:"中府",x:-0.32,y:1.42,z:0.12},
+    {name:"云门",x:-0.28,y:1.48,z:0.14},
+    {name:"天府",x:-0.22,y:1.20,z:0.08},
+    {name:"侠白",x:-0.20,y:1.02,z:0.07},
+    {name:"尺泽",x:-0.18,y:0.84,z:0.05},
+    {name:"孔最",x:-0.16,y:0.64,z:0.04},
+    {name:"列缺",x:-0.14,y:0.46,z:0.03},
+    {name:"经渠",x:-0.12,y:0.38,z:0.02},
+    {name:"太渊",x:-0.11,y:0.32,z:0.02},
+    {name:"鱼际",x:-0.10,y:0.22,z:0.04},
+    {name:"少商",x:-0.09,y:0.14,z:0.06}
+  ]},
+  {name:"手阳明大肠经",color:0xffaa00,points:[
+    {name:"商阳",x:0.09,y:0.14,z:0.06},
+    {name:"二间",x:0.10,y:0.22,z:0.04},
+    {name:"三间",x:0.11,y:0.30,z:0.03},
+    {name:"合谷",x:0.13,y:0.34,z:0.02},
+    {name:"阳溪",x:0.14,y:0.40,z:0.03},
+    {name:"偏历",x:0.16,y:0.56,z:0.04},
+    {name:"温溜",x:0.17,y:0.68,z:0.05},
+    {name:"下廉",x:0.18,y:0.78,z:0.05},
+    {name:"上廉",x:0.19,y:0.86,z:0.06},
+    {name:"手三里",x:0.20,y:0.94,z:0.07},
+    {name:"曲池",x:0.22,y:1.02,z:0.08},
+    {name:"肘髎",x:0.24,y:1.10,z:0.09},
+    {name:"手五里",x:0.25,y:1.22,z:0.10},
+    {name:"臂臑",x:0.26,y:1.34,z:0.11},
+    {name:"肩髃",x:0.30,y:1.46,z:0.16},
+    {name:"巨骨",x:0.26,y:1.52,z:0.22},
+    {name:"天鼎",x:0.18,y:1.62,z:0.24},
+    {name:"扶突",x:0.14,y:1.66,z:0.22},
+    {name:"禾髎",x:0.08,y:1.70,z:0.16},
+    {name:"迎香",x:0.04,y:1.72,z:0.12}
+  ]},
+  {name:"足阳明胃经",color:0xffff44,points:[
+    {name:"承泣",x:0.03,y:1.74,z:0.10},
+    {name:"四白",x:0.03,y:1.68,z:0.10},
+    {name:"地仓",x:0.06,y:1.64,z:0.11},
+    {name:"大迎",x:0.09,y:1.60,z:0.13},
+    {name:"颊车",x:0.12,y:1.58,z:0.15},
+    {name:"下关",x:0.14,y:1.62,z:0.18},
+    {name:"头维",x:0.16,y:1.74,z:0.20},
+    {name:"人迎",x:0.14,y:1.52,z:0.22},
+    {name:"水突",x:0.12,y:1.44,z:0.22},
+    {name:"气舍",x:0.10,y:1.36,z:0.22},
+    {name:"缺盆",x:0.18,y:1.30,z:0.26},
+    {name:"气户",x:0.20,y:1.22,z:0.22},
+    {name:"库房",x:0.21,y:1.14,z:0.20},
+    {name:"屋翳",x:0.21,y:1.06,z:0.18},
+    {name:"膺窗",x:0.20,y:0.98,z:0.16},
+    {name:"乳中",x:0.18,y:0.90,z:0.14},
+    {name:"乳根",x:0.17,y:0.82,z:0.12},
+    {name:"不容",x:0.16,y:0.74,z:0.10},
+    {name:"承满",x:0.15,y:0.66,z:0.09},
+    {name:"梁门",x:0.14,y:0.58,z:0.08},
+    {name:"关门",x:0.13,y:0.50,z:0.07},
+    {name:"太乙",x:0.12,y:0.42,z:0.06},
+    {name:"滑肉门",x:0.11,y:0.34,z:0.05},
+    {name:"天枢",x:0.10,y:0.26,z:0.04},
+    {name:"外陵",x:0.09,y:0.18,z:0.03},
+    {name:"大巨",x:0.08,y:0.10,z:0.03},
+    {name:"水道",x:0.07,y:0.02,z:0.02},
+    {name:"归来",x:0.06,y:-0.06,z:0.02},
+    {name:"气冲",x:0.05,y:-0.14,z:0.02},
+    {name:"髀关",x:0.10,y:-0.34,z:0.04},
+    {name:"伏兔",x:0.11,y:-0.54,z:0.04},
+    {name:"阴市",x:0.10,y:-0.72,z:0.03},
+    {name:"梁丘",x:0.09,y:-0.88,z:0.03},
+    {name:"犊鼻",x:0.08,y:-1.00,z:0.02},
+    {name:"足三里",x:0.07,y:-1.16,z:0.02},
+    {name:"上巨虚",x:0.06,y:-1.30,z:0.02},
+    {name:"条口",x:0.05,y:-1.42,z:0.02},
+    {name:"下巨虚",x:0.04,y:-1.54,z:0.02},
+    {name:"丰隆",x:0.03,y:-1.62,z:0.03},
+    {name:"解溪",x:0.02,y:-1.70,z:0.04},
+    {name:"冲阳",x:0.01,y:-1.76,z:0.05},
+    {name:"陷谷",x:0.00,y:-1.82,z:0.06},
+    {name:"内庭",x:-0.01,y:-1.86,z:0.07},
+    {name:"厉兑",x:-0.02,y:-1.90,z:0.08}
+  ]},
+  {name:"足太阴脾经",color:0xff44ff,points:[
+    {name:"隐白",x:-0.02,y:-1.90,z:-0.08},
+    {name:"大都",x:-0.01,y:-1.86,z:-0.07},
+    {name:"太白",x:0.00,y:-1.82,z:-0.06},
+    {name:"公孙",x:-0.03,y:-1.76,z:-0.05},
+    {name:"商丘",x:-0.04,y:-1.70,z:-0.04},
+    {name:"三阴交",x:-0.05,y:-1.54,z:-0.03},
+    {name:"漏谷",x:-0.06,y:-1.42,z:-0.02},
+    {name:"地机",x:-0.07,y:-1.30,z:-0.02},
+    {name:"阴陵泉",x:-0.08,y:-1.16,z:-0.02},
+    {name:"血海",x:-0.09,y:-0.88,z:-0.03},
+    {name:"箕门",x:-0.10,y:-0.54,z:-0.04},
+    {name:"冲门",x:-0.05,y:-0.14,z:-0.02},
+    {name:"府舍",x:-0.06,y:-0.06,z:-0.02},
+    {name:"腹结",x:-0.07,y:0.02,z:-0.02},
+    {name:"大横",x:-0.08,y:0.10,z:-0.03},
+    {name:"腹哀",x:-0.09,y:0.18,z:-0.04},
+    {name:"食窦",x:-0.17,y:0.82,z:-0.12},
+    {name:"天溪",x:-0.18,y:0.90,z:-0.14},
+    {name:"胸乡",x:-0.19,y:0.98,z:-0.16},
+    {name:"周荣",x:-0.20,y:1.06,z:-0.18},
+    {name:"大包",x:-0.21,y:1.14,z:-0.20}
+  ]},
+  {name:"手少阴心经",color:0xdd2222,points:[
+    {name:"极泉",x:-0.30,y:1.34,z:-0.11},
+    {name:"青灵",x:-0.25,y:1.22,z:-0.10},
+    {name:"少海",x:-0.22,y:1.02,z:-0.08},
+    {name:"灵道",x:-0.19,y:0.84,z:-0.06},
+    {name:"通里",x:-0.17,y:0.64,z:-0.05},
+    {name:"阴郄",x:-0.15,y:0.46,z:-0.04},
+    {name:"神门",x:-0.13,y:0.32,z:-0.02},
+    {name:"少府",x:-0.10,y:0.22,z:-0.04},
+    {name:"少冲",x:-0.09,y:0.14,z:-0.06}
+  ]},
+  {name:"手太阳小肠经",color:0xffbb22,points:[
+    {name:"少泽",x:0.09,y:0.14,z:-0.06},
+    {name:"前谷",x:0.10,y:0.22,z:-0.04},
+    {name:"后溪",x:0.11,y:0.30,z:-0.03},
+    {name:"腕骨",x:0.13,y:0.34,z:-0.02},
+    {name:"阳谷",x:0.14,y:0.40,z:-0.03},
+    {name:"养老",x:0.16,y:0.56,z:-0.04},
+    {name:"支正",x:0.17,y:0.68,z:-0.05},
+    {name:"小海",x:0.22,y:1.02,z:-0.08},
+    {name:"肩贞",x:0.26,y:1.34,z:-0.11},
+    {name:"臑俞",x:0.30,y:1.46,z:-0.16},
+    {name:"天宗",x:0.18,y:1.30,z:-0.26},
+    {name:"秉风",x:0.16,y:1.22,z:-0.24},
+    {name:"曲垣",x:0.14,y:1.14,z:-0.22},
+    {name:"肩外俞",x:0.12,y:1.06,z:-0.20},
+    {name:"肩中俞",x:0.10,y:0.98,z:-0.18},
+    {name:"天窗",x:0.12,y:1.44,z:-0.22},
+    {name:"天容",x:0.14,y:1.52,z:-0.22},
+    {name:"颧髎",x:0.08,y:1.64,z:-0.13},
+    {name:"听宫",x:0.12,y:1.68,z:-0.15}
+  ]},
+  {name:"足太阳膀胱经",color:0x2288ff,points:[
+    {name:"睛明",x:0.02,y:1.74,z:0.08},
+    {name:"攒竹",x:0.02,y:1.78,z:0.09},
+    {name:"眉冲",x:0.02,y:1.82,z:0.10},
+    {name:"曲差",x:0.04,y:1.84,z:0.12},
+    {name:"五处",x:0.06,y:1.86,z:0.14},
+    {name:"承光",x:0.08,y:1.87,z:0.16},
+    {name:"通天",x:0.10,y:1.88,z:0.18},
+    {name:"络却",x:0.12,y:1.86,z:0.20},
+    {name:"玉枕",x:0.14,y:1.80,z:0.24},
+    {name:"天柱",x:0.16,y:1.70,z:0.26},
+    {name:"大杼",x:0.18,y:1.52,z:-0.28},
+    {name:"风门",x:0.18,y:1.44,z:-0.28},
+    {name:"肺俞",x:0.18,y:1.36,z:-0.28},
+    {name:"厥阴俞",x:0.18,y:1.28,z:-0.28},
+    {name:"心俞",x:0.18,y:1.20,z:-0.28},
+    {name:"督俞",x:0.18,y:1.12,z:-0.28},
+    {name:"膈俞",x:0.18,y:1.04,z:-0.28},
+    {name:"肝俞",x:0.18,y:0.96,z:-0.28},
+    {name:"胆俞",x:0.18,y:0.88,z:-0.28},
+    {name:"脾俞",x:0.18,y:0.80,z:-0.28},
+    {name:"胃俞",x:0.18,y:0.72,z:-0.28},
+    {name:"三焦俞",x:0.18,y:0.64,z:-0.28},
+    {name:"肾俞",x:0.18,y:0.56,z:-0.28},
+    {name:"气海俞",x:0.18,y:0.48,z:-0.28},
+    {name:"大肠俞",x:0.18,y:0.40,z:-0.28},
+    {name:"关元俞",x:0.18,y:0.32,z:-0.28},
+    {name:"小肠俞",x:0.18,y:0.24,z:-0.28},
+    {name:"膀胱俞",x:0.18,y:0.16,z:-0.28},
+    {name:"中膂俞",x:0.18,y:0.08,z:-0.28},
+    {name:"白环俞",x:0.18,y:0.00,z:-0.28},
+    {name:"上髎",x:0.16,y:-0.06,z:-0.26},
+    {name:"次髎",x:0.16,y:-0.12,z:-0.26},
+    {name:"中髎",x:0.16,y:-0.18,z:-0.26},
+    {name:"下髎",x:0.16,y:-0.24,z:-0.26},
+    {name:"会阳",x:0.14,y:-0.30,z:-0.24},
+    {name:"承扶",x:0.12,y:-0.40,z:-0.22},
+    {name:"殷门",x:0.11,y:-0.56,z:-0.20},
+    {name:"浮郄",x:0.10,y:-0.70,z:-0.18},
+    {name:"委阳",x:0.09,y:-0.84,z:-0.16},
+    {name:"委中",x:0.08,y:-0.96,z:-0.14},
+    {name:"附分",x:0.20,y:1.44,z:-0.30},
+    {name:"魄户",x:0.20,y:1.36,z:-0.30},
+    {name:"膏肓",x:0.20,y:1.28,z:-0.30},
+    {name:"神堂",x:0.20,y:1.20,z:-0.30},
+    {name:"譩譆",x:0.20,y:1.12,z:-0.30},
+    {name:"膈关",x:0.20,y:1.04,z:-0.30},
+    {name:"魂门",x:0.20,y:0.96,z:-0.30},
+    {name:"阳纲",x:0.20,y:0.88,z:-0.30},
+    {name:"意舍",x:0.20,y:0.80,z:-0.30},
+    {name:"胃仓",x:0.20,y:0.72,z:-0.30},
+    {name:"肓门",x:0.20,y:0.64,z:-0.30},
+    {name:"志室",x:0.20,y:0.56,z:-0.30},
+    {name:"胞肓",x:0.20,y:0.48,z:-0.30},
+    {name:"秩边",x:0.20,y:0.40,z:-0.30},
+    {name:"合阳",x:0.07,y:-1.10,z:-0.12},
+    {name:"承筋",x:0.06,y:-1.22,z:-0.10},
+    {name:"承山",x:0.05,y:-1.34,z:-0.08},
+    {name:"飞扬",x:0.04,y:-1.46,z:-0.07},
+    {name:"跗阳",x:0.03,y:-1.58,z:-0.06},
+    {name:"昆仑",x:0.02,y:-1.70,z:-0.05},
+    {name:"仆参",x:0.01,y:-1.78,z:-0.06},
+    {name:"申脉",x:0.00,y:-1.84,z:-0.07},
+    {name:"金门",x:-0.01,y:-1.88,z:-0.08},
+    {name:"京骨",x:-0.02,y:-1.92,z:-0.09},
+    {name:"束骨",x:-0.03,y:-1.94,z:-0.10},
+    {name:"足通谷",x:-0.04,y:-1.96,z:-0.11},
+    {name:"至阴",x:-0.05,y:-1.98,z:-0.12}
+  ]},
+  {name:"足少阴肾经",color:0x8844ff,points:[
+    {name:"涌泉",x:-0.05,y:-1.98,z:0.12},
+    {name:"然谷",x:-0.04,y:-1.92,z:0.09},
+    {name:"太溪",x:-0.03,y:-1.78,z:0.06},
+    {name:"大钟",x:-0.04,y:-1.72,z:0.05},
+    {name:"水泉",x:-0.05,y:-1.64,z:0.04},
+    {name:"照海",x:-0.04,y:-1.58,z:0.03},
+    {name:"复溜",x:-0.06,y:-1.46,z:0.03},
+    {name:"交信",x:-0.07,y:-1.38,z:0.02},
+    {name:"筑宾",x:-0.08,y:-1.22,z:0.02},
+    {name:"阴谷",x:-0.09,y:-0.96,z:0.04},
+    {name:"横骨",x:-0.04,y:-0.24,z:0.02},
+    {name:"大赫",x:-0.05,y:-0.16,z:0.02},
+    {name:"气穴",x:-0.06,y:-0.08,z:0.02},
+    {name:"四满",x:-0.07,y:0.00,z:0.02},
+    {name:"中注",x:-0.08,y:0.08,z:0.03},
+    {name:"肓俞",x:-0.09,y:0.16,z:0.04},
+    {name:"商曲",x:-0.10,y:0.24,z:0.05},
+    {name:"石关",x:-0.11,y:0.32,z:0.06},
+    {name:"阴都",x:-0.12,y:0.40,z:0.07},
+    {name:"腹通谷",x:-0.13,y:0.48,z:0.08},
+    {name:"幽门",x:-0.14,y:0.56,z:0.09},
+    {name:"步廊",x:-0.16,y:0.74,z:0.10},
+    {name:"神封",x:-0.17,y:0.82,z:0.11},
+    {name:"灵墟",x:-0.18,y:0.90,z:0.12},
+    {name:"神藏",x:-0.19,y:0.98,z:0.13},
+    {name:"彧中",x:-0.20,y:1.06,z:0.14},
+    {name:"俞府",x:-0.21,y:1.14,z:0.15}
+  ]},
+  {name:"手厥阴心包经",color:0xff2288,points:[
+    {name:"天池",x:-0.22,y:1.02,z:0.10},
+    {name:"天泉",x:-0.23,y:1.14,z:0.09},
+    {name:"曲泽",x:-0.20,y:0.84,z:0.07},
+    {name:"郄门",x:-0.18,y:0.66,z:0.06},
+    {name:"间使",x:-0.16,y:0.54,z:0.05},
+    {name:"内关",x:-0.15,y:0.46,z:0.04},
+    {name:"大陵",x:-0.13,y:0.34,z:0.03},
+    {name:"劳宫",x:-0.10,y:0.24,z:0.04},
+    {name:"中冲",x:-0.09,y:0.16,z:0.05}
+  ]},
+  {name:"手少阳三焦经",color:0x22ddbb,points:[
+    {name:"关冲",x:0.09,y:0.16,z:-0.05},
+    {name:"液门",x:0.10,y:0.24,z:-0.04},
+    {name:"中渚",x:0.11,y:0.32,z:-0.03},
+    {name:"阳池",x:0.13,y:0.36,z:-0.03},
+    {name:"外关",x:0.15,y:0.46,z:-0.04},
+    {name:"支沟",x:0.17,y:0.58,z:-0.05},
+    {name:"会宗",x:0.18,y:0.66,z:-0.06},
+    {name:"三阳络",x:0.19,y:0.74,z:-0.06},
+    {name:"四渎",x:0.20,y:0.82,z:-0.07},
+    {name:"天井",x:0.22,y:0.94,z:-0.08},
+    {name:"清冷渊",x:0.23,y:1.06,z:-0.09},
+    {name:"消泺",x:0.24,y:1.18,z:-0.10},
+    {name:"臑会",x:0.25,y:1.30,z:-0.11},
+    {name:"肩髎",x:0.30,y:1.44,z:-0.18},
+    {name:"天髎",x:0.24,y:1.48,z:-0.24},
+    {name:"天牖",x:0.16,y:1.60,z:-0.24},
+    {name:"翳风",x:0.14,y:1.66,z:-0.20},
+    {name:"瘈脉",x:0.12,y:1.70,z:-0.18},
+    {name:"颅息",x:0.10,y:1.74,z:-0.16},
+    {name:"角孙",x:0.08,y:1.78,z:-0.14},
+    {name:"耳门",x:0.06,y:1.74,z:-0.12},
+    {name:"和髎",x:0.04,y:1.70,z:-0.10},
+    {name:"丝竹空",x:0.02,y:1.74,z:-0.08}
+  ]},
+  {name:"足少阳胆经",color:0x22ff88,points:[
+    {name:"瞳子髎",x:0.02,y:1.74,z:-0.08},
+    {name:"听会",x:0.04,y:1.70,z:-0.10},
+    {name:"上关",x:0.06,y:1.74,z:-0.12},
+    {name:"颔厌",x:0.08,y:1.78,z:-0.14},
+    {name:"悬颅",x:0.10,y:1.80,z:-0.16},
+    {name:"悬厘",x:0.12,y:1.78,z:-0.18},
+    {name:"曲鬓",x:0.14,y:1.74,z:-0.20},
+    {name:"率谷",x:0.16,y:1.78,z:-0.22},
+    {name:"天冲",x:0.18,y:1.74,z:-0.24},
+    {name:"浮白",x:0.18,y:1.68,z:-0.25},
+    {name:"头窍阴",x:0.18,y:1.62,z:-0.26},
+    {name:"完骨",x:0.18,y:1.56,z:-0.27},
+    {name:"本神",x:0.16,y:1.70,z:-0.26},
+    {name:"阳白",x:0.14,y:1.74,z:-0.22},
+    {name:"头临泣",x:0.12,y:1.78,z:-0.20},
+    {name:"目窗",x:0.10,y:1.80,z:-0.18},
+    {name:"正营",x:0.08,y:1.82,z:-0.16},
+    {name:"承灵",x:0.06,y:1.80,z:-0.14},
+    {name:"脑空",x:0.04,y:1.76,z:-0.12},
+    {name:"风池",x:0.16,y:1.64,z:-0.28},
+    {name:"肩井",x:0.22,y:1.40,z:-0.30},
+    {name:"渊腋",x:0.24,y:1.10,z:-0.24},
+    {name:"辄筋",x:0.22,y:1.02,z:-0.22},
+    {name:"日月",x:0.20,y:0.84,z:-0.18},
+    {name:"京门",x:0.18,y:0.60,z:-0.24},
+    {name:"带脉",x:0.20,y:0.40,z:-0.22},
+    {name:"五枢",x:0.18,y:0.20,z:-0.20},
+    {name:"维道",x:0.16,y:0.10,z:-0.18},
+    {name:"居髎",x:0.14,y:0.00,z:-0.16},
+    {name:"环跳",x:0.20,y:-0.30,z:-0.26},
+    {name:"风市",x:0.18,y:-0.60,z:-0.22},
+    {name:"中渎",x:0.16,y:-0.80,z:-0.20},
+    {name:"膝阳关",x:0.14,y:-0.96,z:-0.18},
+    {name:"阳陵泉",x:0.12,y:-1.04,z:-0.16},
+    {name:"阳交",x:0.10,y:-1.20,z:-0.14},
+    {name:"外丘",x:0.09,y:-1.30,z:-0.12},
+    {name:"光明",x:0.08,y:-1.40,z:-0.10},
+    {name:"阳辅",x:0.07,y:-1.50,z:-0.09},
+    {name:"悬钟",x:0.06,y:-1.60,z:-0.08},
+    {name:"丘墟",x:0.04,y:-1.72,z:-0.07},
+    {name:"足临泣",x:0.03,y:-1.80,z:-0.08},
+    {name:"地五会",x:0.02,y:-1.86,z:-0.09},
+    {name:"侠溪",x:0.01,y:-1.90,z:-0.10},
+    {name:"足窍阴",x:0.00,y:-1.94,z:-0.11}
+  ]},
+  {name:"足厥阴肝经",color:0x88ff44,points:[
+    {name:"大敦",x:0.00,y:-1.94,z:0.11},
+    {name:"行间",x:0.01,y:-1.90,z:0.10},
+    {name:"太冲",x:0.02,y:-1.86,z:0.09},
+    {name:"中封",x:0.04,y:-1.72,z:0.07},
+    {name:"蠡沟",x:0.05,y:-1.60,z:0.08},
+    {name:"中都",x:0.06,y:-1.50,z:0.09},
+    {name:"膝关",x:0.07,y:-1.40,z:0.10},
+    {name:"曲泉",x:0.08,y:-1.04,z:0.16},
+    {name:"阴包",x:0.10,y:-0.80,z:0.14},
+    {name:"足五里",x:0.12,y:-0.60,z:0.12},
+    {name:"阴廉",x:0.14,y:-0.30,z:0.10},
+    {name:"急脉",x:0.06,y:-0.20,z:0.06},
+    {name:"章门",x:0.18,y:0.40,z:0.22},
+    {name:"期门",x:0.20,y:0.84,z:0.18}
+  ]},
+  {name:"任脉",color:0xffeeee,points:[
+    {name:"会阴",x:0.00,y:-0.30,z:0.00},
+    {name:"曲骨",x:0.00,y:-0.20,z:0.00},
+    {name:"中极",x:0.00,y:-0.10,z:0.00},
+    {name:"关元",x:0.00,y:0.00,z:0.00},
+    {name:"石门",x:0.00,y:0.08,z:0.00},
+    {name:"气海",x:0.00,y:0.16,z:0.00},
+    {name:"阴交",x:0.00,y:0.24,z:0.00},
+    {name:"神阙",x:0.00,y:0.32,z:0.00},
+    {name:"水分",x:0.00,y:0.40,z:0.00},
+    {name:"下脘",x:0.00,y:0.48,z:0.00},
+    {name:"建里",x:0.00,y:0.56,z:0.00},
+    {name:"中脘",x:0.00,y:0.64,z:0.00},
+    {name:"上脘",x:0.00,y:0.72,z:0.00},
+    {name:"巨阙",x:0.00,y:0.80,z:0.00},
+    {name:"鸠尾",x:0.00,y:0.88,z:0.00},
+    {name:"中庭",x:0.00,y:0.96,z:0.00},
+    {name:"膻中",x:0.00,y:1.04,z:0.00},
+    {name:"玉堂",x:0.00,y:1.12,z:0.00},
+    {name:"紫宫",x:0.00,y:1.20,z:0.00},
+    {name:"华盖",x:0.00,y:1.28,z:0.00},
+    {name:"璇玑",x:0.00,y:1.36,z:0.00},
+    {name:"天突",x:0.00,y:1.44,z:0.00},
+    {name:"廉泉",x:0.00,y:1.56,z:0.00},
+    {name:"承浆",x:0.00,y:1.66,z:0.00}
+  ]},
+  {name:"督脉",color:0xdddddd,points:[
+    {name:"长强",x:0.00,y:-0.30,z:-0.08},
+    {name:"腰俞",x:0.00,y:-0.20,z:-0.08},
+    {name:"腰阳关",x:0.00,y:-0.10,z:-0.08},
+    {name:"命门",x:0.00,y:0.00,z:-0.08},
+    {name:"悬枢",x:0.00,y:0.08,z:-0.08},
+    {name:"脊中",x:0.00,y:0.16,z:-0.08},
+    {name:"中枢",x:0.00,y:0.24,z:-0.08},
+    {name:"筋缩",x:0.00,y:0.32,z:-0.08},
+    {name:"至阳",x:0.00,y:0.40,z:-0.08},
+    {name:"灵台",x:0.00,y:0.48,z:-0.08},
+    {name:"神道",x:0.00,y:0.56,z:-0.08},
+    {name:"身柱",x:0.00,y:0.64,z:-0.08},
+    {name:"陶道",x:0.00,y:0.72,z:-0.08},
+    {name:"大椎",x:0.00,y:0.80,z:-0.08},
+    {name:"哑门",x:0.00,y:0.92,z:-0.08},
+    {name:"风府",x:0.00,y:1.02,z:-0.08},
+    {name:"脑户",x:0.00,y:1.12,z:-0.08},
+    {name:"强间",x:0.00,y:1.22,z:-0.08},
+    {name:"后顶",x:0.00,y:1.32,z:-0.08},
+    {name:"百会",x:0.00,y:1.42,z:-0.08},
+    {name:"前顶",x:0.00,y:1.52,z:-0.08},
+    {name:"囟会",x:0.00,y:1.60,z:-0.08},
+    {name:"上星",x:0.00,y:1.68,z:-0.08},
+    {name:"神庭",x:0.00,y:1.72,z:-0.08},
+    {name:"素髎",x:0.00,y:1.74,z:0.00},
+    {name:"水沟",x:0.00,y:1.70,z:0.04},
+    {name:"兑端",x:0.00,y:1.68,z:0.08},
+    {name:"龈交",x:0.00,y:1.64,z:0.10}
+  ]}
+];
+
+// ===================== 初始化Three.js =====================
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.getElementById('container').appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+const initCamPos = {x:0,y:0,z:3.2};
+camera.position.set(initCamPos.x,initCamPos.y,initCamPos.z);
+
+const ambientLight = new THREE.AmbientLight(0xffffff,0.6);
+scene.add(ambientLight);
+const dirLight = new THREE.DirectionalLight(0xffffff,0.8);
+dirLight.position.set(3,3,3);
+scene.add(dirLight);
+
+// 人体简易躯干模型
+const bodyGeo = new THREE.CylinderGeometry(0.35,0.28,1.4,16);
+const bodyMat = new THREE.MeshStandardMaterial({color:0xffddcc,transparent:true,opacity:0.7});
+const bodyMesh = new THREE.Mesh(bodyGeo,bodyMat);
+bodyMesh.position.y = 0.2;
+scene.add(bodyMesh);
+
+// 绘制经络线 + 穴位点
+let allPointsObj = [];
+let highlightMesh = null;
+meridianData.forEach(mer=>{
+  const pts = mer.points.map(p=>new THREE.Vector3(p.x,p.y,p.z));
+  const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+  const lineMat = new THREE.LineBasicMaterial({color:mer.color});
+  const line = new THREE.Line(lineGeo,lineMat);
+  scene.add(line);
+
+  const dotMat = new THREE.MeshBasicMaterial({color:mer.color});
+  const dotGeo = new THREE.SphereGeometry(0.018,8,8);
+  mer.points.forEach(p=>{
+    const dot = new THREE.Mesh(dotGeo,dotMat);
+    dot.position.set(p.x,p.y,p.z);
+    dot.userData = {name:p.name};
+    scene.add(dot);
+    allPointsObj.push(dot);
+  })
+});
+
+// 搜索穴位
+const searchInput = document.getElementById('searchInput');
+searchInput.addEventListener('input',()=>{
+  const kw = searchInput.value.trim();
+  if(!kw){
+    if(highlightMesh){scene.remove(highlightMesh);highlightMesh=null;}
+    return;
+  }
+  const target = allPointsObj.find(d=>d.userData.name.includes(kw));
+  if(target){
+    // 镜头移动
+    const p = target.position;
+    camera.position.set(p.x*1.8, p.y+0.4, p.z+1.2);
+    controls.target.copy(p);
+    // 高亮闪烁球
+    if(highlightMesh) scene.remove(highlightMesh);
+    const hGeo = new THREE.SphereGeometry(0.04,12,12);
+    const hMat = new THREE.MeshBasicMaterial({color:0xffffff});
+    highlightMesh = new THREE.Mesh(hGeo,hMat);
+    highlightMesh.position.copy(p);
+    scene.add(highlightMesh);
+  }else{
+    if(highlightMesh){scene.remove(highlightMesh);highlightMesh=null;}
+  }
+});
+
+// 重置视角按钮
+document.getElementById('resetBtn').onclick = ()=>{
+  camera.position.set(initCamPos.x,initCamPos.y,initCamPos.z);
+  controls.target.set(0,0,0);
+  if(highlightMesh){scene.remove(highlightMesh);highlightMesh=null;}
+  searchInput.value = '';
+};
+
+window.addEventListener('resize',()=>{
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// 动画循环
+function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  if(highlightMesh){
+    highlightMesh.scale.setScalar(1+Math.sin(Date.now()*0.006)*0.25);
+  }
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>
