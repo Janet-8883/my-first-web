@@ -20,10 +20,10 @@ body{overflow:hidden;background:#111;color:#fff;}
   <button id="resetBtn">重置视角</button>
   <div id="tip">搜索后自动定位并高亮穴位，拖拽旋转，滚轮缩放</div>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
-<script>
+<script type="module">
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+
 // ===================== 完整经络穴位数据 =====================
 const meridianData = [
   {name:"手太阴肺经",color:0xff4444,points:[
@@ -415,32 +415,27 @@ const meridianData = [
     {name:"龈交",x:0.00,y:1.64,z:0.10}
   ]}
 ];
-
 // ===================== 初始化Three.js =====================
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.getElementById('container').appendChild(renderer.domElement);
-
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 const initCamPos = {x:0,y:0,z:3.2};
 camera.position.set(initCamPos.x,initCamPos.y,initCamPos.z);
-
 const ambientLight = new THREE.AmbientLight(0xffffff,0.6);
 scene.add(ambientLight);
 const dirLight = new THREE.DirectionalLight(0xffffff,0.8);
 dirLight.position.set(3,3,3);
 scene.add(dirLight);
-
 // 人体简易躯干模型
 const bodyGeo = new THREE.CylinderGeometry(0.35,0.28,1.4,16);
 const bodyMat = new THREE.MeshStandardMaterial({color:0xffddcc,transparent:true,opacity:0.7});
 const bodyMesh = new THREE.Mesh(bodyGeo,bodyMat);
 bodyMesh.position.y = 0.2;
 scene.add(bodyMesh);
-
 // 绘制经络线 + 穴位点
 let allPointsObj = [];
 let highlightMesh = null;
@@ -450,7 +445,6 @@ meridianData.forEach(mer=>{
   const lineMat = new THREE.LineBasicMaterial({color:mer.color});
   const line = new THREE.Line(lineGeo,lineMat);
   scene.add(line);
-
   const dotMat = new THREE.MeshBasicMaterial({color:mer.color});
   const dotGeo = new THREE.SphereGeometry(0.018,8,8);
   mer.points.forEach(p=>{
@@ -486,7 +480,6 @@ searchInput.addEventListener('input',()=>{
     if(highlightMesh){scene.remove(highlightMesh);highlightMesh=null;}
   }
 });
-
 // 重置视角按钮
 document.getElementById('resetBtn').onclick = ()=>{
   camera.position.set(initCamPos.x,initCamPos.y,initCamPos.z);
@@ -494,13 +487,11 @@ document.getElementById('resetBtn').onclick = ()=>{
   if(highlightMesh){scene.remove(highlightMesh);highlightMesh=null;}
   searchInput.value = '';
 };
-
 window.addEventListener('resize',()=>{
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
-
 // 动画循环
 function animate(){
   requestAnimationFrame(animate);
